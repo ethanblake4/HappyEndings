@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>2Dimensions - Flare Example</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mobile-detect/1.4.3/mobile-detect.min.js"></script>
+    <script src="../build/Flare.min.js"></script>
+    <script src="../build/gl-matrix.js"></script>
+    <script src="../build/canvaskit.js"></script>
+
+    <script src="game.js" compile></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+
+    <script>
+
+        /** Mobile Device **/
+
+        let msocket,msetup=false;
+
+        function connectToHost() {
+
+            msocket = io();
+            let rm = $('#code-input').val();
+            console.log(rm);
+            let json = JSON.stringify({'room': rm, 'name': $('#name-input').val()});
+            console.log(json);
+
+            msocket.emit('client connect to', json);
+            msocket.on('people', function (people) {
+                console.log(people);
+            });
+
+            /*if (!msetup) {
+                let gn = new GyroNorm();
+                let lastUp = performance.now();
+
+                gn.init().then(function () {
+                    gn.start(function (data) {
+                        $('#stuy').html((data.do.gamma + data.do.alpha).toString());
+                        if (performance.now() > 40 + lastUp) {
+                            lastUp = performance.now();
+                            msocket.emit('orient', JSON.stringify({'x': data.do.gamma, 'y': data.do.beta}));
+                        }
+                    });
+                }).catch(function (e) {
+                    console.log(e);
+                    alert("Your device does not support orientation detection");
+                });
+                msetup= true;
+            }*/
+
+        }
+
+        /** Desktop Host **/
+        let game;
+        let scene = GameObject.newDefault();
+        let clr = new ColorCover(0,0,0);
+        let connText = new TextObject(window.innerWidth/2-110, window.innerHeight/2+140, "PLAYERS CONNECTED: 0", 255, 255, 0, "LouisGeorgeCafe.ttf", 19);
+        let titleScene = new GameObject(-18, -80, []);
+        //scene.addChild(new ColorClear(0.2, 0.4, 0.6));
+        scene.addChild(new FlareObject(0, -100, "backbin.flr", 1.6));
+        scene.addChild(new ColorCover(0.7,0.5,1,0.4));
+        titleScene.addChild(new TextObject(window.innerWidth/2-230, window.innerHeight/2-40, "Happy Endings", 255, 255, 0, "YouthBrushDaylight.otf", 100));
+        titleScene.addChild(new TextObject(window.innerWidth/2-120, window.innerHeight/2+40, "A GAME BY ETHAN ELSHYEB", 255, 255, 0, "LouisGeorgeCafe.ttf", 19));
+        titleScene.addChild(new TextObject(window.innerWidth/2-200, window.innerHeight/2+90, "BASED ON THE STORY BY MARGARET ATWOOD", 255, 255, 0, "LouisGeorgeCafe.ttf", 19));
+        titleScene.addChild(connText);
+        scene.addChild(titleScene);
+        //scene.addChild(new FlareObject(100, 200, "Jacko.flr", 0.5));
+        //scene.addChild(new FlareObject(400, 300, "guy2.flr", 0.5));
+        //scene.addChild(new FlareObject(700, 800, "Jacko.flr", 0.5));
+        scene.addChild(clr);
+
+
+        function onLoad() {
+            game = new Game(document.getElementById("canvas"), scene, [
+                "Jacko.flr",
+                "joe.flr",
+                "guy2.flr",
+                "backbin.flr"
+            ], ["YouthBrushDaylight.otf", "acid.ttf", "LouisGeorgeCafe.ttf"]);
+            game.addFrameListener(() => {
+                clr.a = clr.a - 0.01;
+                clr.a = clr.a < 0 ? 0 : clr.a;
+            });
+            game.start();
+        }
+    </script>
+</head>
+
+<body onload="onLoad()" style="background-color: black">
+    <canvas id="canvas" style="position:absolute;margin:0;padding:0;"></canvas>
+</body>
+
+</html>
