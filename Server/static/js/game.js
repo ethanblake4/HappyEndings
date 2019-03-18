@@ -32,8 +32,9 @@ class Game {
 		this.loadedCount = 0;
 		this.loadedFonts = 0;
 		this.actors = {};
+		this.actorInstances = {};
 		this.loadingScene = new ColorClear(0,0,0);
-		this.loadingScene.addChild(new TextObject(100, 100, "Loading...", 255,255,255,null, 30));
+		this.loadingScene.addChild(new TextObject(100, 100, "Loading...", [1,1,1,1],null, 30));
 	}
 
 	/**
@@ -60,9 +61,13 @@ class Game {
 	_load() {
 		this.assetPaths.forEach((path) => {
 			this._loadActor("./flare/"+path, (cb) => {
-				if(cb != null && !cb.error) {
+				if(cb != null && !cb.error && !this.actors[path]) {
 					cb.initialize(this.graphics);
 					this.actors[path] = cb;
+					this.actorInstances[path] = cb.makeInstance();
+					this.actorInstances[path].initialize(this.graphics);
+					this.actorInstances[path].advance(0);
+					this.actorInstances[path].draw(this.graphics);
 					console.log("Loaded actor " + path);
 					this.loadedCount++;
 					if(this.loadedCount === this.assetPaths.length && this.loadedFonts === this.fontPaths.length) {
@@ -70,7 +75,7 @@ class Game {
 						this.loaded = true;
 					}
 				} else {
-					console.log("Actor load error: " + path);
+					console.log("Actor load error or duplicate: " + path);
 					console.log(cb);
 				}
 			});
@@ -300,6 +305,10 @@ class GameObject {
 		});
 		return found;
 	}
+
+	destroy() {
+
+	}
 }
 
 /**
@@ -342,6 +351,8 @@ class RectCollider extends Collider {
 				this.x + this.width < other.x ||
 				this.y > other.y + other.height ||
 				this.y + this.height < other.y)
+		} else if (other instanceof PointCollider) {
+			return other.checkOverlap(this);
 		} else return false;
 	}
 
@@ -355,9 +366,37 @@ class RectCollider extends Collider {
 
 }
 
+class PointCollider extends Collider {
+
+	constructor(x, y) {
+		super();
+		this.x = x;
+		this.y = y;
+	}
+
+	checkOverlap(/** @type Collider */ other) {
+		if (other instanceof RectCollider) {
+			return !(this.x > other.x + other.width ||
+				this.x < other.x ||
+				this.y > other.y + other.height ||
+				this.y < other.y)
+		} else if (other instanceof PointCollider) {
+			return this.x === other.x && this.y === other.y;
+		} else return false;
+	}
+
+	checkInside(/** @type Collider */ other) {
+		if (other instanceof RectCollider) {
+			return (this.x > other.x && this.y > other.y
+				&& this.x < other.x + other.width
+				&& this.y < other.y + other.height);
+		} else return false;
+	}
+}
+
 class FlareObject extends GameObject {
 
-	constructor(x, y, url, scale) {
+	constructor(x, y, url, scale, animations) {
 		super(x, y, []);
 		this.url = url;
 		this.scale = scale;
@@ -367,6 +406,8 @@ class FlareObject extends GameObject {
 		vt[3] = scale;
 		vt[4] = this.x;
 		vt[5] = this.y;
+		this.animations = animations;
+		this._animations = [];
 	}
 
 	initGfx(graphics, canvasKit) {
@@ -382,21 +423,24 @@ class FlareObject extends GameObject {
 		this._lastAdvanceTime = Date.now();
 
 		const actor = this.game.actors[this.url];
-		const actorInstance = actor.makeInstance();
-		actorInstance.initialize(graphics);
+		const actorInstance = this.game.actorInstances[this.url];
+		//actorInstance.initialize(graphics);
 
 		this._actor = actor;
 		this._actorInstance = actorInstance;
 
+		console.log("before i");
 		if(actorInstance) {
-			actorInstance.initialize(graphics);
+			//actorInstance.initialize(graphics);
 			if(actorInstance._Animations.length) {
 				/** Instantiate the Animation. */
-				this._animation = actorInstance._Animations[0];
-				this._animationInstance = new Flare.AnimationInstance(this._animation._Actor, this._animation);
-				if(!this._animationInstance) console.log("No animation found at " + url);
+				actorInstance._Animations.forEach((a, i) => {
+					this._animations.push(new Flare.AnimationInstance(a._Actor, a));
+					if(!this._animations[i]) console.log(`No animation ${i} found at ${this.url}`);
+				});
 			}
 		}
+		console.log("after i");
 	}
 
 	draw(graphics, canvasKit, xoff, yoff) {
@@ -409,13 +453,15 @@ class FlareObject extends GameObject {
 
 		const actor = this._actorInstance;
 
-		if(this._animationInstance)
-		{
-			const ai = this._animationInstance;
-			/** Compute the new time and apply it */
-			ai.time = ai.time + elapsed;
-			ai.apply(this._actorInstance, 1.0);
-		}
+		this.animations.forEach((i) => {
+			if(this._animations[i])
+			{
+				const ai = this._animations[i];
+				/** Compute the new time and apply it */
+				ai.time = ai.time + elapsed;
+				ai.apply(this._actorInstance, 1.0);
+			}
+		});
 
 		if(actor)
 		{
@@ -426,7 +472,7 @@ class FlareObject extends GameObject {
 			vt[4] = this.x;
 			vt[5] = this.y;
 			/** Advance the actor to its new time. */
-			actor.advance(elapsed);
+			if(this.animations.length > 0) actor.advance(elapsed);
 			graphics.save();
 			graphics.setView(this._viewTransform);
 			this._actorInstance.draw(graphics);
@@ -451,12 +497,9 @@ class ColorClear extends GameObject {
 }
 
 class ColorCover extends GameObject {
-	constructor(r, g, b, a = 1.0) {
+	constructor(color) {
 		super(0, 0, []);
-		this.r = r;
-		this.g = g;
-		this.b = b;
-		this.a = a;
+		this.color = color;
 	}
 
 	initGfx(graphics, canvasKit) {
@@ -465,20 +508,22 @@ class ColorCover extends GameObject {
 
 	draw(graphics, canvasKit, xoff, yoff) {
 		super.draw(graphics, canvasKit, xoff, yoff);
-		graphics.setPaintColor(this.paint, [this.r, this.g, this.b, this.a]);
+		graphics.setPaintColor(this.paint, this.color);
 		graphics.drawRect(0, 0, this.game.width, this.game.height, this.paint);
 		super.draw(graphics, canvasKit, xoff, yoff);
 	}
+
+	destroy() {
+        super.destroy();
+    }
 }
 
 class TextObject extends GameObject {
 
-	constructor(x, y, text, r, g, b, font, size, fill = true) {
+	constructor(x, y, text, color, font, size, fill = true) {
 		super(x, y, []);
 		this.text = text;
-		this.r = r;
-		this.g = g;
-		this.b = b;
+		this.color = color;
 		this.font = font;
 		this.size = size;
 		this.fill = fill;
@@ -487,13 +532,201 @@ class TextObject extends GameObject {
 	initGfx(graphics, canvasKit) {
 		super.initGfx();
 		this.skFont = new canvasKit.SkFont(this.font == null ? null : this.game.fonts[this.font], this.size);
-		this.paint = new canvasKit.SkPaint();
-		this.paint.setColor(canvasKit.Color(this.r, this.g, this.b, 1.0));
+		this.paint = graphics.makePaint(false);
+		graphics.setPaintColor(this.paint, this.color);
 		this.paint.setAntiAlias(true);
 	}
 
 	draw(graphics, canvasKit, xoff, yoff) {
 		super.draw(graphics, canvasKit, xoff, yoff);
+        graphics.setPaintColor(this.paint, this.color);
 		graphics._SkCanvas.drawText(this.text, this.x + xoff, this.y + yoff, this.paint, this.skFont);
 	}
+}
+
+Game.mouseListeners = [];
+window.addEventListener('mousemove', (ev) => {
+	let cl = new PointCollider(ev.x, ev.y);
+	Game.mouseListeners.forEach((l) => {
+		if(cl.checkOverlap(l.collider)) l.hover(ev.x, ev.y);
+		else l.noHover(ev.x,ev.y);
+	});
+});
+
+window.addEventListener('click', (ev) => {
+	let cl = new PointCollider(ev.x, ev.y);
+	Game.mouseListeners.forEach((l) => {
+		if(cl.checkOverlap(l.collider)) l.click(ev.x, ev.y);
+	});
+});
+
+class DelegateGameObject extends GameObject {
+
+	constructor(x, y) {
+		super(x, y, []);
+		this.hasInit = false;
+	}
+
+	builder() {
+
+		return [];
+	}
+
+	didChange() {
+		if(!this.hasInit) {
+			return this.hasInit = true;
+		}
+		return false;
+	}
+
+	draw(graphics, canvasKit, xoff, yoff) {
+		if(this.didChange()) {
+			this.children.forEach((c) => c.destroy());
+			this.children = [];
+			this.builder().forEach((it) => {
+				this.addChild(it);
+			})
+		}
+		super.draw(graphics, canvasKit, xoff, yoff);
+	}
+}
+
+class DelegateMouseListener extends DelegateGameObject {
+
+	constructor (x, y, collider) {
+		super(x, y, []);
+		this.collider = collider;
+		Game.mouseListeners.push(this);
+		this.hovering = false;
+		this.oldHovering = false;
+	}
+
+	hover(x, y) {
+		this.hovering = true;
+		document.body.style.cursor = 'pointer';
+	}
+
+	noHover(x, y) {
+		this.hovering = false;
+		document.body.style.cursor = '';
+	}
+
+	click(x, y) {}
+
+	didChange() {
+		let d = super.didChange() || this.hovering !== this.oldHovering;
+		this.oldHovering = this.hovering;
+		return d;
+	}
+
+	destroy() {
+		super.destroy();
+		Game.mouseListeners.filter(m => m !== this);
+	}
+}
+
+class DelegateColorLerp extends DelegateGameObject {
+
+	constructor(x, y, color) {
+		super(x, y);
+		this.dirty = true;
+		this.color = color;
+		this.animRemainingFrames = 0;
+	}
+
+	didChange() {
+		if(this.dirty) {
+			this.dirty = false;
+			return true;
+		}
+		return super.didChange();
+	}
+
+	lerp(col1, col2, frames) {
+		this.col1 = col1;
+		this.col2 = col2;
+		this.animRemainingFrames = frames;
+		this.length = frames;
+		this.color = col1;
+		this.dirty = true;
+	}
+
+	draw(graphics, canvasKit, xoff, yoff) {
+		super.draw(graphics, canvasKit, xoff, yoff);
+		if(this.animRemainingFrames > 0) {
+			let f1 = (this.animRemainingFrames - this.length) / this.length;
+			let f2 = 1.0 - f1;
+			this.color = [
+				this.col1[0] * f1 + this.col2[0] * f2,
+				this.col1[1] * f1 + this.col2[2] * f2,
+				this.col1[2] * f1 + this.col2[2] * f2,
+				this.col1[3] * f1 + this.col2[3] * f2,
+			];
+			this.animRemainingFrames--;
+		}
+		this.dirty = true;
+	}
+}
+
+class ModColorLerp extends GameObject {
+    constructor(x, y, color) {
+        super(x, y, []);
+        this.color = color;
+        this.animRemainingFrames = -1;
+    }
+
+    lerp(col1, col2, frames) {
+        this.col1 = col1;
+        this.col2 = col2;
+        this.animRemainingFrames = frames;
+        this.length = frames;
+        this.color = col1;
+    }
+
+    draw(graphics, canvasKit, xoff, yoff) {
+        super.draw(graphics, canvasKit, xoff, yoff);
+        if(this.animRemainingFrames >= 0) {
+            let f1 = (this.length - this.animRemainingFrames) / this.length;
+            let f2 = 1.0 - f1;
+            this.color = [
+                this.col1[0] * f2 + this.col2[0] * f1,
+                this.col1[1] * f2 + this.col2[2] * f1,
+                this.col1[2] * f2 + this.col2[2] * f1,
+                this.col1[3] * f2 + this.col2[3] * f1,
+            ];
+            this.animRemainingFrames--;
+            this.children.forEach((c) => {
+                c.color = this.color;
+            });
+        }
+    }
+}
+
+class PositionLerp extends GameObject {
+    constructor(x, y, children) {
+        super(x, y, children);
+        this.animRemainingFrames = -1;
+    }
+
+    lerp(x2, y2, frames) {
+        console.log("lerp");
+        this.x1 = this.x;
+        this.x2 = x2;
+        this.y1 = this.y;
+        this.y2 = y2;
+        this.animRemainingFrames = frames;
+        this.length = frames;
+    }
+
+    draw(graphics, canvasKit, xoff, yoff) {
+        super.draw(graphics, canvasKit, xoff, yoff);
+        if(this.animRemainingFrames >= 0) {
+            let f1 = (this.length - this.animRemainingFrames) / this.length;
+            console.log(f1);
+            let f2 = 1.0 - f1;
+            this.x = f2 * this.x1 + f1 * this.x2;
+            this.y = f2 * this.y1 + f1 * this.y2;
+            this.animRemainingFrames--;
+        }
+    }
 }

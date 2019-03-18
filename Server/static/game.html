@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Happy Endings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+    <script src="js/Flare.min.js"></script>
+    <script src="js/gl-matrix.js"></script>
+    <script src="js/game.js" compile></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+
+    <script>
+
+        const socket = io();
+        let connectedP = 0;
+        socket.emit('host create session', '');
+        socket.on('session created', function(sessionId) {
+
+        });
+        socket.on('join', function() {
+            console.log("JOIN");
+            connText.text = "PLAYERS CONNECTED: " + ++connectedP;
+        });
+        socket.on('leave', function () {
+            console.log("LEAVE");
+            connText.text = "PLAYERS CONNECTED: " + --connectedP;
+        });
+
+        /** Desktop Host **/
+
+        class ColorRect extends GameObject {
+
+            constructor(x, y, width, height, color) {
+                super(x, y, []);
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            initGfx(graphics, canvasKit) {
+                super.initGfx(graphics, canvasKit);
+                this.paint = graphics.makePaint(false);
+                graphics.setPaintColor(this.paint, this.color);
+            }
+
+            draw(graphics, canvasKit, xoff, yoff) {
+                super.draw(graphics, canvasKit, xoff, yoff);
+                graphics.drawRect(this.x + xoff, this.y + yoff, this.x+xoff+this.width, this.y+yoff+this.height, this.paint);
+            }
+        }
+
+        class StartButton extends DelegateMouseListener {
+            builder() {
+                return [
+                    new ColorRect(0, 0, 80, 40, [this.hovering ? 1 : 0.5, 0, this.hovering ? 1: 0.5, 1]),
+                    new TextObject(19, 27, "Start", [this.hovering ? 0 : 1, this.hovering ? 0 : 1, this.hovering ? 0 : 1, 1], "LouisGeorgeCafe.ttf", 19)
+                ];
+            }
+            click(x, y) {
+                super.click(x, y);
+                socket.emit('start');
+                titleLerp.lerp([255,255,0,1], [255,255,0,0], 19);
+                positionLerp.lerp(0, 500, 15);
+                cov.lerp([0.7,0.5,1,0.4], [1,0.7,1,0.12], 40);
+                this.collider = new Collider();
+                clr.lerp([0,0,0,0], [0,0,0,1], 60);
+                setTimeout(() => {
+                    fo.y = -600 + window.innerHeight / 1.5;
+                    fo.animations = [1];
+                    clr.lerp([0,0,0,1], [0,0,0,0], 60);
+                    titleScene.removeChildren(() => true);
+                    titleScene.addChild(new FlareObject(300, -238 + window.innerHeight / 1.5, "mary2.flr", 0.3, [0]));
+                    titleScene.addChild(new FlareObject(400, -238 + window.innerHeight / 1.5, "heart2.flr", 0.2, [0]));
+                    titleScene.addChild(new TextObject(window.innerWidth/2-120, window.innerHeight/2+40, "John and Mary fell in love and got married.", [255,255,0,1], "LouisGeorgeCafe.ttf", 19))
+                }, 1000);
+            }
+        }
+
+        let game;
+        let scene = GameObject.newDefault();
+        let clr = new ModColorLerp(0,0, [0,0,0,1]);
+        clr.addChild(new ColorCover([0,0,0, 1]));
+        let connText = new TextObject(window.innerWidth/2-110, window.innerHeight/2+140, "PLAYERS CONNECTED: 0", [1,1,0,1], "LouisGeorgeCafe.ttf", 19);
+        let titleScene = new GameObject(-5, -80, []);
+        let titleLerp = new ModColorLerp(0, 0, [255, 255, 0, 1]);
+        let positionLerp = new PositionLerp(0, 0, []);
+        titleLerp.addChild(new TextObject(window.innerWidth/2-230, window.innerHeight/2-40, "Happy Endings", [255,255,0,1], "YouthBrushDaylight.otf", 100));
+        titleLerp.addChild(new TextObject(window.innerWidth/2-120, window.innerHeight/2+40, "A GAME BY ETHAN ELSHYEB", [255,255,0,1], "LouisGeorgeCafe.ttf", 19));
+        titleLerp.addChild(new TextObject(window.innerWidth/2-200, window.innerHeight/2+90, "BASED ON THE STORY BY MARGARET ATWOOD", [255,255,0,1], "LouisGeorgeCafe.ttf", 19));
+        titleLerp.addChild(connText);
+
+        let cov = new ModColorLerp(0,0,[0.7,0.5,1,0.4]);
+        cov.addChild(new ColorCover([0.7,0.5,1,0.4]));
+        let back1 = new FlareObject(0, -100, "back.flr", 1.2, [0]);
+        scene.addChild(back1);
+        scene.addChild(cov);
+        titleScene.addChild(titleLerp);
+        let fo = new FlareObject(0,2000,"Sunset3.flr",1.2,[]);
+        scene.addChild(fo);
+        scene.addChild(titleScene);
+        positionLerp.addChild(new StartButton(window.innerWidth/2-50, window.innerHeight/2+130, new RectCollider(window.innerWidth/2-50, window.innerHeight/2+130, 80, 40)));
+        scene.addChild(positionLerp);
+
+
+        //scene.addChild(new FlareObject(100, 200, "Jacko.flr", 0.5));
+        //scene.addChild(new FlareObject(700, 800, "Jacko.flr", 0.5));
+
+        scene.addChild(clr);
+
+        function onLoad() {
+            game = new Game(document.getElementById("canvas"), scene, [
+                "mary2.flr",
+                "joe.flr",
+                "guy2.flr",
+                "back.flr",
+                "Sunset3.flr",
+                "heart2.flr"
+            ], ["YouthBrushDaylight.otf", "LouisGeorgeCafe.ttf"]);
+            clr.lerp([0,0,0,1], [0,0,0,0], 60);
+            game.start();
+        }
+    </script>
+</head>
+
+<body onload="onLoad()" style="background-color: black">
+    <canvas id="canvas" style="position:absolute;margin:0;padding:0;"></canvas>
+</body>
+
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Happy Endings</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet">
+    <style>
+        body {
+            height: 100vh;
+            /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#c149e5+0,e58c39+100 */
+            /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#c149e5+0,d65024+100 */
+            background: #c149e5; /* Old browsers */
+            background: -moz-linear-gradient(top, #c149e5 0%, #d65024 100%); /* FF3.6-15 */
+            background: -webkit-linear-gradient(top, #c149e5 0%,#d65024 100%); /* Chrome10-25,Safari5.1-6 */
+            background: linear-gradient(to bottom, #c149e5 0%,#d65024 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+            color: white;
+            font-family: 'Raleway', sans-serif;
+        }
+    </style>
+    <script>
+        function connectToHost() {
+            const socket = io();
+
+            socket.emit('client connect to', '');
+            socket.on('people', function (people) {
+                console.log(people);
+            });
+            socket.on('start', function() {
+                document.querySelector("#msg").innerHTML = "Started";
+            });
+        }
+        connectToHost();
+    </script>
+</head>
+<body>
+    <p id="msg">Waiting for the host to start the game...</p>
+</body>
+</html>
