@@ -4,37 +4,143 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Happy Endings</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+    <script src="/js/sio.js"></script>
+    <script src="/js/gyronorm.complete.js"></script>
     <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet">
     <style>
         body {
             height: 100vh;
-            /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#c149e5+0,e58c39+100 */
-            /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#c149e5+0,d65024+100 */
             background: #c149e5; /* Old browsers */
             background: -moz-linear-gradient(top, #c149e5 0%, #d65024 100%); /* FF3.6-15 */
-            background: -webkit-linear-gradient(top, #c149e5 0%,#d65024 100%); /* Chrome10-25,Safari5.1-6 */
-            background: linear-gradient(to bottom, #c149e5 0%,#d65024 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+            background: -webkit-linear-gradient(top, #c149e5 0%, #d65024 100%); /* Chrome10-25,Safari5.1-6 */
+            background: linear-gradient(to bottom, #c149e5 0%, #d65024 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
             color: white;
             font-family: 'Raleway', sans-serif;
+            padding: 16px;
+        }
+
+        .GameButton {
+            margin: 12px;
+            text-align: center;
+            background-color: #fff;
+            color: #000;
+            padding: 10px;
+            display: none;
+            cursor: pointer;
         }
     </style>
     <script>
-        function connectToHost() {
-            const socket = io();
+        const socket = io();
+        let cuAnswers, didChooseThisRound = false;
+        let myperson;
+        let gn = new GyroNorm();
+        let gnNormDist = 0;
+        let gnNormAll = 0;
 
+        gn.init().then(() => {});
+
+
+        window.onload = function () {
+            for (let i = 0; i < 3; i++) {
+                document.querySelector(`#btn`+i).addEventListener('click', function (evt) {
+                    let pseudoIndex = evt.target.id.substring(3);
+                    if (!didChooseThisRound) {
+                        evt.target.style.backgroundColor = '#ddb62b';
+                        socket.emit('client choice', {
+                            person: myperson,
+                            props: cuAnswers[i]['props'],
+                        });
+                        didChooseThisRound = true;
+                        setTimeout(() => {
+                            hideButtons();
+                            document.querySelector("#msg").innerHTML = "Waiting for the story to start...";
+                        }, 1000);
+                    }
+                });
+            }
+        };
+
+        function hideButtons() {
+            for (let i = 0; i < 3; i++) {
+                document.querySelector(`#btn${i}`).style.display = 'none';
+            }
+        }
+
+        function connectToHost() {
             socket.emit('client connect to', '');
             socket.on('people', function (people) {
                 console.log(people);
             });
-            socket.on('start', function() {
-                document.querySelector("#msg").innerHTML = "Started";
+            socket.on('start', function () {
+                document.querySelector("#msg").innerHTML = "Waiting for the current story to end...";
             });
+            socket.on('select character', (characterName) => {
+                myperson = characterName;
+                document.querySelector("#msg").innerHTML =
+                    `You are on team <b>${characterName.charAt(0).toUpperCase() + characterName.slice(1)}</b>!`;
+            });
+            socket.on('question', (q) => {
+                console.log(q);
+                didChooseThisRound = false;
+                document.querySelector("#msg").innerHTML = `${q['text']}`;
+                let i = 0;
+                if(q.hasOwnProperty('answers')) {
+                    cuAnswers = q['answers'];
+                    q['answers'].map(it => it.name).forEach((answer) => {
+                        let x = document.querySelector(`#btn${i}`);
+                        x.style.display = 'block';
+                        x.style.backgroundColor = '#fff';
+                        x.innerHTML = answer;
+                        i++;
+                    });
+                } else if (q.hasOwnProperty('gyro') && q['gyro'].toString() === '1') {
+                    document.querySelector('#msg').innerHTML = "GRYO";
+                    gn.start((data) => {
+                        let nd = Math.abs(data.dm.x) + Math.abs(data.dm.y) + Math.abs(data.dm.z);
+                        gnNormDist += nd;
+                        gnNormAll += nd + Math.abs(data.dm.alpha) + Math.abs(data.dm.beta) + Math.abs(data.dm.gamma);
+                        gnNormAll = Math.round((gnNormAll * 100) % 99);
+                        if(gnNormDist > 130) {
+                            gn.stop();
+                            if (!didChooseThisRound) {
+                                socket.emit('client gyro', {
+                                    'gyro': gnNormAll
+                                });
+                                didChooseThisRound = true;
+                                setTimeout(() => {
+                                    hideButtons();
+                                    document.querySelector("#msg").innerHTML = "Waiting for the story to start...";
+                                }, 2500);
+                                gnNormDist = 0;
+                                gnNormAll = 0;
+                            }
+                            document.querySelector('#msg').innerHTML = "Random number: " + gnNormAll;
+                        }
+                    });
+                }
+            });
+
+            socket.on('noquestion', () => {
+                socket.emit('client choice', {
+                    person: myperson,
+                    props: { },
+                });
+                document.querySelector("#msg").innerHTML = "No question this round! Help your teammates."
+                setTimeout(() => {
+                    document.querySelector("#msg").innerHTML = "Waiting for the story to start...";
+                }, 1000);
+            });
+
         }
+
         connectToHost();
     </script>
 </head>
 <body>
-    <p id="msg">Waiting for the host to start the game...</p>
+<p id="msg">Waiting for the host to start the game...</p>
+<div id="buttons" style="display:none; padding-top: 24px;"></div>
+<div id="btn0" class="GameButton"></div>
+<div id="btn1" class="GameButton"></div>
+<div id="btn2" class="GameButton"></div>
 </body>
 </html>

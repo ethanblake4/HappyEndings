@@ -152,6 +152,14 @@ class Game {
      */
     get game() { return this; }
 
+    static get absoluteX() {
+        return 0;
+    }
+
+    static get absoluteY() {
+        return 0;
+    }
+
     /**
      * @returns The width in physical pixels of this game
      */
@@ -231,15 +239,27 @@ class GameObject {
     }
 
     /**
-     * Only works for objects with a reduced offset of (0, 0)
      * @returns {boolean} whether this GameObject is outside the viewport.
      */
     get outsideViewport() {
-        return this.x < 0 || this.y < 0 || this.x > this.game.width || this.y > this.game.height;
+        return this.absoluteX < 0 || this.absoluteY < 0 || this.absoluteX > this.game.width || this.absoluteY > this.game.height;
     }
 
     /**
-     * Adds a GameObject to this GameObject's list of children
+     * Adds a GameObject to the beginning of this GameObject's list of children
+     * Will reparent and call GameObject.attach() on the child to be added.
+     *
+     * @param child {GameObject} The GameObject to add as a child
+     */
+    addFirstChild(/** @type GameObject **/ child) {
+        child.parent = this;
+        child.attach();
+        this.children.unshift(child);
+        return child;
+    }
+
+    /**
+     * Adds a GameObject to the end of this GameObject's list of children
      * Will reparent and call GameObject.attach() on the child to be added.
      *
      * @param child {GameObject} The GameObject to add as a child
@@ -248,6 +268,7 @@ class GameObject {
         child.parent = this;
         child.attach();
         this.children.push(child);
+        return child;
     }
 
     /**
@@ -309,6 +330,14 @@ class GameObject {
     destroy() {
 
     }
+
+    get absoluteX() {
+        return Game.absoluteX + this.x;
+    }
+
+    get absoluteY() {
+        return this.parent.absoluteY + this.y;
+    }
 }
 
 /**
@@ -332,6 +361,10 @@ class Collider {
      */
     checkInside(/** @type Collider */ other) {
         return false; // Stub
+    }
+
+    get boundingRect() {
+        return new RectCollider(0,0,0,0);
     }
 }
 
@@ -364,6 +397,10 @@ class RectCollider extends Collider {
         } else return false;
     }
 
+    get boundingRect() {
+        return this;
+    }
+
 }
 
 class PointCollider extends Collider {
@@ -391,6 +428,10 @@ class PointCollider extends Collider {
                 && this.x < other.x + other.width
                 && this.y < other.y + other.height);
         } else return false;
+    }
+
+    get boundingRect() {
+        return new RectCollider(this.x, this.y, 0, 0);
     }
 }
 
@@ -469,8 +510,8 @@ class FlareObject extends GameObject {
 
             vt[0] = this.scale;
             vt[3] = this.scale;
-            vt[4] = this.x;
-            vt[5] = this.y;
+            vt[4] = this.x + xoff;
+            vt[5] = this.y + yoff;
             /** Advance the actor to its new time. */
             if(this.animations.length > 0) actor.advance(elapsed);
             graphics.save();
@@ -482,16 +523,13 @@ class FlareObject extends GameObject {
 }
 
 class ColorClear extends GameObject {
-    constructor(r, g, b, a = 1.0) {
+    constructor(color) {
         super(0, 0, []);
-        this.r = r;
-        this.g = g;
-        this.b = b;
-        this.a = a;
+        this.color = color;
     }
 
     draw(graphics, canvasKit, xoff, yoff) {
-        graphics.clear([this.r, this.g, this.b, this.a]);
+        graphics.clear(this.color);
         super.draw(graphics, canvasKit, xoff, yoff);
     }
 }
@@ -508,6 +546,7 @@ class ColorCover extends GameObject {
 
     draw(graphics, canvasKit, xoff, yoff) {
         super.draw(graphics, canvasKit, xoff, yoff);
+        if(this.color[3] === 0) return; // Don't draw if there's nothing to draw
         graphics.setPaintColor(this.paint, this.color);
         graphics.drawRect(0, 0, this.game.width, this.game.height, this.paint);
         super.draw(graphics, canvasKit, xoff, yoff);
@@ -621,9 +660,38 @@ class DelegateMouseListener extends DelegateGameObject {
 
     destroy() {
         super.destroy();
-        Game.mouseListeners.filter(m => m !== this);
+        Game.mouseListeners = Game.mouseListeners.filter(m => m !== this);
     }
 }
+
+EasingFunctions = {
+    // no easing, no acceleration
+    linear: function (t) { return t },
+    // accelerating from zero velocity
+    easeInQuad: function (t) { return t*t },
+    // decelerating to zero velocity
+    easeOutQuad: function (t) { return t*(2-t) },
+    // acceleration until halfway, then deceleration
+    easeInOutQuad: function (t) { return t<.5 ? 2*t*t : -1+(4-2*t)*t },
+    // accelerating from zero velocity
+    easeInCubic: function (t) { return t*t*t },
+    // decelerating to zero velocity
+    easeOutCubic: function (t) { return (--t)*t*t+1 },
+    // acceleration until halfway, then deceleration
+    easeInOutCubic: function (t) { return t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1 },
+    // accelerating from zero velocity
+    easeInQuart: function (t) { return t*t*t*t },
+    // decelerating to zero velocity
+    easeOutQuart: function (t) { return 1-(--t)*t*t*t },
+    // acceleration until halfway, then deceleration
+    easeInOutQuart: function (t) { return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t },
+    // accelerating from zero velocity
+    easeInQuint: function (t) { return t*t*t*t*t },
+    // decelerating to zero velocity
+    easeOutQuint: function (t) { return 1+(--t)*t*t*t*t },
+    // acceleration until halfway, then deceleration
+    easeInOutQuint: function (t) { return t<.5 ? 16*t*t*t*t*t : 1+16*(--t)*t*t*t*t }
+};
 
 class DelegateColorLerp extends DelegateGameObject {
 
@@ -669,10 +737,16 @@ class DelegateColorLerp extends DelegateGameObject {
 }
 
 class ModColorLerp extends GameObject {
-    constructor(x, y, color) {
-        super(x, y, []);
+    constructor(x, y, color, children = []) {
+        super(x, y, children);
         this.color = color;
         this.animRemainingFrames = -1;
+    }
+
+    static newWithCover(x,y,color) {
+        let c = new ModColorLerp(x,y,color);
+        c.addChild(new ColorCover(color));
+        return c;
     }
 
     lerp(col1, col2, frames) {
@@ -703,13 +777,13 @@ class ModColorLerp extends GameObject {
 }
 
 class PositionLerp extends GameObject {
-    constructor(x, y, children) {
+    constructor(x, y, children, ease = EasingFunctions.linear) {
         super(x, y, children);
         this.animRemainingFrames = -1;
+        this.ease = ease;
     }
 
     lerp(x2, y2, frames) {
-        console.log("lerp");
         this.x1 = this.x;
         this.x2 = x2;
         this.y1 = this.y;
@@ -718,11 +792,19 @@ class PositionLerp extends GameObject {
         this.length = frames;
     }
 
+    lerpAdd(x2,y2,frames) {
+        this.x1 = this.x;
+        this.x2 = this.x+x2;
+        this.y1 = this.y;
+        this.y2 = this.y+y2;
+        this.animRemainingFrames = frames;
+        this.length = frames;
+    }
+
     draw(graphics, canvasKit, xoff, yoff) {
         super.draw(graphics, canvasKit, xoff, yoff);
         if(this.animRemainingFrames >= 0) {
-            let f1 = (this.length - this.animRemainingFrames) / this.length;
-            console.log(f1);
+            let f1 = this.ease((this.length - this.animRemainingFrames) / this.length);
             let f2 = 1.0 - f1;
             this.x = f2 * this.x1 + f1 * this.x2;
             this.y = f2 * this.y1 + f1 * this.y2;

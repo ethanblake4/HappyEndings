@@ -4,8 +4,7 @@
 <head>
     <title>Happy Endings</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+    <script src="js/sio.js"></script>
     <script src="js/Flare.min.js"></script>
     <script src="js/gl-matrix.js"></script>
     <script src="js/game.js" compile></script>
@@ -18,23 +17,469 @@
     </style>
 
     <script>
-
         const socket = io();
-        let connectedP = 0;
+        let connectedP = 0, sgcl = 0, didBegin = false;
         socket.emit('host create session', '');
-        socket.on('session created', function(sessionId) {
-
+        socket.on('session created', function (sessionId) {
         });
-        socket.on('join', function() {
+        socket.on('join', function () {
             console.log("JOIN");
-            connText.text = "PLAYERS CONNECTED: " + ++connectedP;
+            if (!didBegin) connText.text = "PLAYERS CONNECTED: " + ++connectedP;
         });
         socket.on('leave', function () {
             console.log("LEAVE");
-            connText.text = "PLAYERS CONNECTED: " + --connectedP;
+            connectedP--;
+            if (!didBegin) connText.text = "PLAYERS CONNECTED: " + connectedP;
+        });
+        socket.on('server got client response', function () {
+            theText.text = "Waiting for responses (" + ++sgcl + " / " + connectedP + ")...";
+            if (sgcl === connectedP) {
+                socket.emit('make story');
+            }
         });
 
+        socket.on('here the story', function (responses) {
+            let randomNumber = responses[2];
+            let responsesJohn = responses[1];
+            let responsesMary = responses[0];
+            console.log(responsesMary);
+            console.log(responsesJohn);
+            let johnChar = {};
+            let maryChar = {};
+            responsesJohn.forEach((pr_) => {
+                Object.defineProperty(johnChar, pr_.prop, pr_.value);
+            });
+            responsesMary.forEach((pr_) => {
+                Object.defineProperty(maryChar, pr_.prop, pr_.value);
+            });
+
+            displayStory(johnChar, maryChar, randomNumber);
+
+        });
+
+        function displayStory(johnChar, maryChar, randomNumber) {
+            let timeout = 0;
+            makeStory(johnChar, maryChar, randomNumber).forEach((component) => {
+                console.log(component);
+                timeout += 1000;
+                setTimeout(() => {
+                    if(component['type'] === 'text') {
+
+                    }
+                });
+            });
+        }
+
+        function makeStory(johnChar, maryChar, randomNumber) {
+            if(usePreset) {
+                johnChar = {
+                    'skill': 0,
+                    'loveInterest': 'mary',
+                    'age': 35,
+                    'goodness': 1,
+                    'gun': 0
+                };
+                maryChar = {
+                    'love': 2,
+                    'trustingness': 1,
+                    'risk': 1,
+                    'hobby': 'metalworking'
+                };
+            }
+            story = [];
+            let didStartJM = false;
+
+            if (johnChar.hasOwnProperty('skill') && johnChar['skill'] === 2) {
+                story.push({
+                    type: 'scene',
+                    scene: 'farm'
+                });
+                story.push({
+                    type: 'text',
+                    text: "John and Mary live out on a farm."
+                });
+                didStartJM = true;
+            } else {
+                story.push({
+                    type: 'scene',
+                    scene: 'default'
+                });
+            }
+
+            let jm = didStartJM ? "They" : "John and Mary";
+
+            if (johnChar.hasOwnProperty('loveInterest')
+                && ((johnChar['loveInterest'] !== 'mary' && maryChar['love'] !== 2) ||
+                    johnChar['loveInterest'] === 'mary' && maryChar['love'] === 2)) {
+                if (johnChar['loveInterest'] !== 'mary') {
+                    if (maryChar['love'] === 0) {
+                        story.push({
+                            type: 'text',
+                            text: "Mary loves John, but John doesn't love Mary."
+                        });
+                        if(johnChar.hasOwnProperty('goodness') && johnChar['goodness'] > 0.5) {
+
+                        } else {
+                            // Mary loves John, he doesn't love her, he isn't a good person
+                            story.push({
+                                type: 'text',
+                                text: 'He merely uses her body for selfish pleasure and ego gratification of a tepid kind.'
+                            });
+
+                            if(maryChar.hasOwnProperty('trustingness') && maryChar['trustingness'] > 0.5) {
+                                story.push({
+                                    type: 'text',
+                                    text: 'He comes to her apartment twice a week and she cooks' +
+                                        ' him dinner, you\'ll notice that he doesn\'t even consider' +
+                                        ' her worth the price of a dinner out, and after he\'s eaten' +
+                                        ' dinner he fucks her and after that he falls asleep, while' +
+                                        ' she does the dishes so he won\'t think she\'s untidy,' +
+                                        ' having all those dirty dishes lying around, and puts on' +
+                                        ' fresh lipstick so she\'ll look good when he wakes up,' +
+                                        ' but when he wakes up he doesn\'t even notice, he puts on' +
+                                        ' his socks and his shorts and his pants and his shirt' +
+                                        ' and his tie and his shoes, the reverse order from the' +
+                                        ' one in which he took them off.'
+                                });
+                            } else {
+                                story.push({
+                                    type: 'text',
+                                    text: "Mary is strong-willed and understands that what’s going on in the relationship is wrong, "
+                                });
+                                if(maryChar.hasOwnProperty('attachment') && maryChar['attachment'] > 0.5) {
+                                    story.push({
+                                        type: 'text_continue',
+                                        text: "but she sticks with it because she’s afraid of losing him."
+                                    });
+                                } else {
+                                    story.push({
+                                        type: 'text_continue',
+                                        text: "so one day she up and confronts him about it" +
+                                            " and that doesn’t go well, and John shows his" +
+                                            " true colors when he throws a fit and tells her" +
+                                            " she’s awful and a whore and nobody will ever" +
+                                            " love her, and then takes her wallet and assumes" +
+                                            " her identity to go on a nationwide shopping spree." +
+                                            " Her credit card company calls her up and she calls the police."
+                                    });
+                                    if(johnChar['age'] > 40) {
+                                        story.push({
+                                            type: 'text',
+                                            text: "Luckily for her, John wasn’t in his physical" +
+                                                " or mental prime and they catch him on camera " +
+                                                "as he’s exiting from the service escalator " +
+                                                "outside a Costco in Utah, and he goes to jail " +
+                                                "for a substantial period of time and isn’t " +
+                                                "seen or heard from after then."
+                                        });
+                                    } else {
+                                        story.push({
+                                            type: 'text',
+                                            text: "John however knows his stuff and manages " +
+                                                "to escape the country before they get to him. " +
+                                                "He meets a wonderful woman named Janet in the " +
+                                                "Caribbean who shows him that he can be a good " +
+                                                "person, and he eventually ends up regretting " +
+                                                "his past actions and sends Mary a letter, but " +
+                                                "she’s since moved and he never hears back. He " +
+                                                "and Janet get married and everything continues as in A."
+                                        });
+                                        story.push({type: 'a'});
+                                        return story;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (maryChar['love'] === 1) {
+                        story.push({
+                            type: 'text',
+                            text: `${jm} are unhappily married. ` +
+                                'Neither of them loves the other, ' +
+                                'but they both feel trapped in the relationship' +
+                                ' since they\'ve led all their friends and relatives' +
+                                'to believe they\'re doing great.'
+                        });
+
+                        story.push({
+                            type: 'text',
+                            text: "Honestly, they had been up until a few months ago, but then "
+                        });
+
+                        if(johnChar['gun'] === 1) {
+                            story.push({
+                                type: 'text_continue',
+                                text: "they got in a few fights, which" +
+                                    " started out about John’s unwillingness" +
+                                    " to give up carrying a gun on him but " +
+                                    "ultimately turned out to be indicative of deeper problems.  "
+                            });
+                        } else if (maryChar['risk'] === 1) {
+                            story.push({
+                                type: 'text_continue',
+                                text: "Mary decided she wanted to go skydiving for" +
+                                    " her birthday and John was too scared and refused," +
+                                    " and Mary decided that John was boring, and John" +
+                                    " decided that Mary had a death wish."
+                            });
+                        }
+                        if(johnChar.hasOwnProperty('goodness') && johnChar['goodness'] <= 0.5) {
+                            story.push({
+                                type: 'text',
+                                text: "John’s the first one to defect; " +
+                                    "he gets too drunk one night at a bar " +
+                                    "and ends up in bed at a girl named Madge’s house. " +
+                                    "He wakes up to a raging hangover and several " +
+                                    "texts from Mary asking where is he, " +
+                                    "where the hell is he, and where the fuck is he."
+                            });
+                            if(maryChar.hasOwnProperty('attachment') && maryChar['attachment'] > 0.5) {
+                                story.push({
+                                    type: 'text',
+                                    text: "He doesn’t respond until the evening, " +
+                                        "making up an excuse about his mom being in the hospital."
+                                });
+                                if(maryChar.hasOwnProperty('trustingness') && maryChar['trustingness'] > 0.5) {
+                                    story.push({
+                                        type: 'text',
+                                        text: "Mary quickly forgives him and apologizes."
+                                    });
+                                } else {
+                                    story.push({
+                                        type: 'text',
+                                        text: "Mary doesn’t completely believe him, " +
+                                            "but she also doesn’t care enough to confront him."
+                                    });
+                                }
+                            } else {
+                                story.push({
+                                    type: 'text',
+                                    text: "He’s not in any state to respond so he just " +
+                                        "avoids looking at his phone which is easy since " +
+                                        "it’s out of battery anyway, and by the time he " +
+                                        "finally plugs it in he’s gotten twelve more texts " +
+                                        "from Mary ending in what’s effectively a breakup " +
+                                        "text (although she leaves it open ended in case " +
+                                        "there’s actually a good explanation.) John considers " +
+                                        "making up a lie, he actually comes up with one he " +
+                                        "thinks is pretty good, but ultimately just replies " +
+                                        "that it’s probably for the best and she agrees and "
+                                });
+                                if(maryChar.hasOwnProperty('risk') && maryChar['risk'] === 1) {
+                                    story.push({
+                                        type: 'text',
+                                        text: "they’re in the process of getting divorced when " +
+                                            "Mary is killed in an extreme snowboarding " +
+                                            "accident (so perhaps John had been right all along)."
+                                    });
+                                }
+                            }
+                        }
+                    } else if (maryChar['love'] === 2) {
+                        story.push({
+                            type: 'text',
+                            text: `${jm} are unhappily married. ` +
+                                'Neither of them loves the other, ' +
+                                'but they both feel trapped in the relationship' +
+                                ' since they\'ve led all their friends and relatives' +
+                                'to believe they\'re doing great.'
+                        });
+                        story.push({
+                            type: 'text',
+                            text: 'Now, Mary\'s secretly a lesbian, ' +
+                                'but this is the 50s and nobody can know that, ' +
+                                'so she keeps it to herself. (As you can tell, this is off to a great start).'
+                        });
+                        story.push({
+                            type: 'text',
+                            text: "John’s the first one to defect; he gets " +
+                                "too drunk one night at a bar and ends up in " +
+                                "bed at a girl named Madge’s house. When he " +
+                                "finally makes it back home, Mary’s royally " +
+                                "pissed, and he tries to make up some excuse " +
+                                "about his mom being sick in the hospital but " +
+                                "Mary can smell that he’s been drinking, and " +
+                                "after a fight which spans several hours they " +
+                                "both realize that there’s really no reason to " +
+                                "continue the relationship and begin to file for divorce. \n"
+                        });
+                        if(randomNumber > 50 && randomNumber < 70) {
+                            story.push({
+                                type: 'text',
+                                text: "A week later, Mary dies in a car crash. "
+                            });
+                        } else {
+                            story.push({
+                                type: 'text',
+                                text: "Mary, fed up with pretending to be straight," +
+                                    " becomes a nun and lives the rest of her" +
+                                    " life doing service for her community. "
+                            });
+                        }
+
+                        story.push({
+                            type: 'text',
+                            text: "As for John, he and Madge hook up a few more" +
+                                " times, fall in love, and everything continues as in A."
+                        });
+
+                        story.push({type: 'a'});
+                        return story;
+                    }
+                } else if (maryChar['love'] === 2) {
+                    // John loves Mary, Mary doesn't like men
+                    story.push({
+                        type: 'text',
+                        text: 'John loves Mary, and for all he (and anyone else) knows, she loves him too.' +
+                            ' The thing is, Mary\'s secretly a lesbian, ' +
+                            'but this is the 50s and nobody can know that, ' +
+                            'so she keeps it to herself and pretends to love him.'
+                    });
+                    if(maryChar.hasOwnProperty('risk') && maryChar['risk'] > 0.5) {
+                        story.push({
+                            type: 'text',
+                            text: 'Now, Mary is quite the risk-taker and hopelessly' +
+                                ' bored as a stay-at-home mom, and through a series' +
+                                ' of complex maneuvers manages to become an undercover' +
+                                ' FBI agent without arousing John’s suspicion. ' +
+                                'However, after training, she is at first aghast to' +
+                                ' discover that her first assignment is to investigate' +
+                                ' evidence of homesexuality in the military.'
+                        });
+                    } else story.push({
+                        type: 'text',
+                        text: 'Now, Mary is hopelessly bored as a stay-at-home mom, ' +
+                            'and gets a part-time job at the local grocery store. ' +
+                            'She meets Marge and they begin seeing each other in secret.'
+                    });
+                }
+            } else if(johnChar.hasOwnProperty('age') && johnChar['age'] > 40
+                && johnChar['loveInterest'] === 'mary' && maryChar['love'] !== 0) {
+                story.push({
+                    type: 'text',
+                    text: 'John, who is an older man, falls in love with Mary, and Mary, who is only twenty-two, feels ' +
+                        'sorry for him because he\'s worried about his hair falling out. She sleeps with him even though ' +
+                        'she\'s not in love with him. She met him at work.'
+                });
+            } else if(johnChar['loveInterest'] === 'mary' && maryChar['love'] === 0) {
+                if(johnChar.hasOwnProperty('goodness') && johnChar['goodness'] > 0.4) {
+                    story.push({
+                        type: 'text',
+                        text: `${jm} love each other very much, and have a supportive relationship that` +
+                            " all their friends agree sets a great example for those around them."
+                    });
+                    if(johnChar['goodness'] < 0.6) {
+                        story.push({
+                            type: 'text',
+                            text: "John's kind of wacky at times, but Mary finds it funny and laughs at all his jokes."
+                        });
+                    }
+                } else {
+                    if(johnChar['goodness'] < 0.4) {
+                        story.push({
+                            type: 'text',
+                            text: jm + " are in love, but despite what Mary thinks John's not actually a great guy; " +
+                                "in fact, he's actually operating what's in effect a massive Ponzi scheme under the guise of " +
+                                "an environmental charity."
+                        });
+
+                        if(maryChar['trustingness'] > 0.5) {
+                            story.push({
+                                type: 'text',
+                                text: 'One day, Mary discovers $40,000 in cash under the cereal in the kitchen cabinets. ' +
+                                    'She confronts John about it, he tries to play it off but she knows something is up ' +
+                                    'and the argument escalates.'
+                            });
+
+                            story.push({
+                                type: 'text',
+                                text: johnChar['gun'] > 0.5 ? 'Eventually, John pulls out his gun and shoots her.' :
+                                    "Eventually, she calls the police and after a detailed investigation that goes on," +
+                                    " in Mary’s opinion, far too long, John is arrested and taken to prison for the rest of his life."
+                            });
+                        } else {
+                            story.push({
+                                type: 'text',
+                                text: 'One day, John comes home in a brand new Tesla Model X that he says he won ' +
+                                    'in a raffle, Mary isn’t the most strong-willed so she believes him and they go ' +
+                                    'for a joyride. A few months later, John is arrested, but Mary refuses to ' +
+                                    'believe he’s guilty and visits him weekly in jail.'
+                            });
+                        }
+                    }
+                }
+            }
+            return story;
+        }
+
+        function doMiddle(which, maryChar, johnChar) {
+            let middle = [];
+            if(which === 1) {
+                if(maryChar.hasOwnProperty('risk') && maryChar['risk'] === 0) {
+                    middle.push({
+                        type: 'text',
+                        text: 'Everything continues as in A.'
+                    });
+                    middle.push({type: 'a'});
+                    return middle;
+                } else {
+                    middle.push({
+                        type: 'text',
+                        text: 'One year into their relationship, Mary decides' +
+                            ' to take a solo backpacking trip to the Himalayas. ' +
+                            'She slips and falls on a steep cliff edge, and goes into a coma.' +
+                            ' John is very sad, they were very in love, but after 5' +
+                            ' months he decides it’s time to move on, and begins dating' +
+                            ' Kylie, a girl he met online. They fall in love and he' +
+                            ' proposes to her just four months later and she says yes,' +
+                            ' but no more than two weeks pass before Mary wakes up.' +
+                            ' John is aghast but it’s not a hard decision to stay with Kylie.' +
+                            ' This part of the story is about Mary’s inconsolable grief' +
+                            ' which ultimately ends in suicide. John marries Kylie' +
+                            ' and everything continues as in A.'
+                    });
+                    middle.push({type: 'a'});
+                }
+            } else if (which === 2) {
+                middle.push({
+                    type: 'text',
+                    text: "Mary meets Rowan, a young businessman with big ambitions. " +
+                        "He starts a firm manufacturing snack packets for airlines," +
+                        " and thanks to his intellect is able to streamline manufacturing" +
+                        " to make them cheaper and higher quality than competitors." +
+                        " They get married, buy a nice house and everything continues as in A."
+                })
+            } else if (which === 3) {
+                if(johnChar.hasOwnProperty('goodness') && johnChar['goodness'] > 0.5) {
+
+                } else {
+                    middle.push({
+                        type: 'text',
+                        text: "John grows more and more disillusioned. " +
+                            "He can’t shake the feeling that Mary is cheating on him," +
+                            " and hires a private investigator, who presents" +
+                            " the evidence that Mary is in a relationship" +
+                            " with her coworker, [Marge/Evan]. " +
+                            "John stalks the coworker, slashing his/her tires," +
+                            " stealing bills and important mail items, " +
+                            "and eventually killing a beloved pet. John is caught" +
+                            " on a security camera stealing mail, is arrested, " +
+                            "and confesses to everything. Mary visits John in prison," +
+                            " and confesses that she no longer loves him and" +
+                            " would like a divorce. John, distraught, picks a " +
+                            "fight in prison and is killed. Mary collects a tidy" +
+                            " life insurance policy, and marries Evan/Marge, and the story continues as in A.\n"
+                    });
+                }
+            }
+        }
+
         /** Desktop Host **/
+
+        let _iJohn, _iMary, debug = true, usePreset = false;
+
+        let assortedScenes = {
+            farm: 'farm.flr'
+        };
 
         class ColorRect extends GameObject {
 
@@ -53,81 +498,237 @@
 
             draw(graphics, canvasKit, xoff, yoff) {
                 super.draw(graphics, canvasKit, xoff, yoff);
-                graphics.drawRect(this.x + xoff, this.y + yoff, this.x+xoff+this.width, this.y+yoff+this.height, this.paint);
+                graphics.drawRect(this.x + xoff, this.y + yoff, this.x + xoff + this.width, this.y + yoff + this.height, this.paint);
             }
         }
 
         class StartButton extends DelegateMouseListener {
             builder() {
                 return [
-                    new ColorRect(0, 0, 80, 40, [this.hovering ? 1 : 0.5, 0, this.hovering ? 1: 0.5, 1]),
-                    new TextObject(19, 27, "Start", [this.hovering ? 0 : 1, this.hovering ? 0 : 1, this.hovering ? 0 : 1, 1], "LouisGeorgeCafe.ttf", 19)
+                    new ColorRect(0, 0, 80, 40, [this.hovering ? 1 : 0.5, 0, this.hovering ? 1 : 0.5, 1]),
+                    new TextObject(19, 27, "Start", [this.hovering ? 0 : 1, this.hovering ? 0 : 1, this.hovering ? 0 : 1, 1],
+                        "LouisGeorgeCafe.ttf", 19)
                 ];
             }
+
             click(x, y) {
                 super.click(x, y);
                 socket.emit('start');
-                titleLerp.lerp([255,255,0,1], [255,255,0,0], 19);
-                positionLerp.lerp(0, 500, 15);
-                cov.lerp([0.7,0.5,1,0.4], [1,0.7,1,0.12], 40);
-                this.collider = new Collider();
-                clr.lerp([0,0,0,0], [0,0,0,1], 60);
+                didBegin = true;
+                displayEndingA();
                 setTimeout(() => {
-                    fo.y = -600 + window.innerHeight / 1.5;
-                    fo.animations = [1];
-                    clr.lerp([0,0,0,1], [0,0,0,0], 60);
-                    titleScene.removeChildren(() => true);
-                    titleScene.addChild(new FlareObject(300, -238 + window.innerHeight / 1.5, "mary2.flr", 0.3, [0]));
-                    //titleScene.addChild(new FlareObject(400, -238 + window.innerHeight / 1.5, "heart2.flr", 0.2, [0]));
-                    titleScene.addChild(new TextObject(window.innerWidth/2-120, window.innerHeight/2-60, "John and Mary fell in love and got married.", [255,255,0,1], "LouisGeorgeCafe.ttf", 19))
+                    this.destroy();
                 }, 1000);
             }
         }
 
-        let game;
-        let scene = GameObject.newDefault();
-        let clr = new ModColorLerp(0,0, [0,0,0,1]);
-        clr.addChild(new ColorCover([0,0,0, 1]));
-        let connText = new TextObject(window.innerWidth/2-110, window.innerHeight/2+140, "PLAYERS CONNECTED: 0", [1,1,0,1], "LouisGeorgeCafe.ttf", 19);
+        class ContinueButton extends DelegateMouseListener {
+            builder() {
+                return [
+                    new ColorRect(0, 0, 120, 40, [this.hovering ? 1 : 0.5, 0, this.hovering ? 1 : 0.5, 1]),
+                    new TextObject(22, 27, "Continue", [this.hovering ? 0 : 1, this.hovering ? 0 : 1, this.hovering ? 0 : 1, 1], "LouisGeorgeCafe.ttf", 19)
+                ];
+            }
+
+            click(x, y) {
+                super.click(x, y);
+                if(!usePreset) {
+                    socket.emit('host question');
+                    theText.text = "Waiting for responses (0 / " + connectedP + ")...";
+                } else {
+                    displayStory({}, {});
+                }
+                this.parent.lerpAdd(0, 400, 30);
+
+                setTimeout(() => {
+                    this.destroy();
+                    document.body.style.cursor = '';
+                }, 1000);
+            }
+        }
+
+        let house, theText;
+
+        function displayEndingA() {
+
+            titleLerp.lerp([255, 255, 0, 1], [255, 255, 0, 0], 19);
+            startButtonPositioner.lerp(0, 500, 15);
+            animatedTitleTonemap.lerp([0.7, 0.5, 1, 0.4], [1, 0.7, 1, 0.12], 40);
+            this.collider = new Collider();
+            globalColorCover.lerp([0, 0, 0, 0], [0, 0, 0, 1], 60);
+            const textCol = [1, 1, 0, 1];
+            const textCol2 = [0, 0, 0, 1];
+            const textX = 600;
+            let textY = window.innerHeight / 2 - 120;
+            let earlyClr = ModColorLerp.newWithCover(0, 0, [0, 0, 0, 0]);
+            house = new FlareObject(-420, -220, "house.flr", 2, [0]);
+            let texts = new ModColorLerp(-300, -188, textCol);
+            let tc = new PositionLerp(0, 0, [texts], EasingFunctions.easeInOutCubic);
+            let heart;
+
+            setTimeout(() => {
+                fo.y = -600 + window.innerHeight / 1.5;
+                fo.animations = [1];
+                globalColorCover.lerp([0, 0, 0, 1], [0, 0, 0, 0], 60);
+                scene.removeChild(back1);
+                titleScene.removeChildren(() => true);
+                titleScene.addChild(earlyClr);
+
+                if (!_iJohn) {
+                    _iJohn = new FlareObject(500, -168 + window.innerHeight / 1.5, "John.flr", 0.215, [0]);
+                    _iJohn = new PositionLerp(0, 0, [_iJohn], EasingFunctions.easeInOutCubic);
+                }
+                titleScene.addChild(_iJohn);
+
+                if (!_iMary) {
+                    _iMary = new FlareObject(300, -138 + window.innerHeight / 1.5, "mary2.flr", 0.3, [0]);
+                    _iMary = new PositionLerp(0, 0, [_iMary], EasingFunctions.easeInOutCubic);
+                }
+
+                titleScene.addChild(_iMary);
+                heart = titleScene.addChild(new FlareObject(460, -138 + window.innerHeight / 1.5, "heart2.flr", 0.1, [0]));
+                titleScene.addChild(tc);
+                texts.addChild(new TextObject(textX, textY += 30, "John and Mary fell in love and got married.",
+                    textCol, "LouisGeorgeCafe.ttf", 22));
+            }, 1000);
+
+            setTimeout(() => {
+                texts.addChild(new TextObject(textX, textY += 30, "They both have worthwhile and remunerative jobs",
+                    textCol, "LouisGeorgeCafe.ttf", 22));
+            }, 2500);
+
+            setTimeout(() => {
+                texts.addChild(new TextObject(textX, textY += 30, "which they find stimulating and challenging.",
+                    textCol, "LouisGeorgeCafe.ttf", 22));
+            }, 3500);
+
+            setTimeout(() => {
+                earlyClr.lerp([0, 0, 0, 0], [0, 0, 0, 1], 30);
+            }, 4500);
+
+            setTimeout(() => {
+                titleScene.removeChild(heart);
+                scene.removeChild(fo);
+                scene.addFirstChild(house);
+                earlyClr.lerp([0, 0, 0, 1], [0, 0, 0, 0], 30);
+                texts.lerp(textCol, textCol2, 30);
+                tc.lerpAdd(160, 0, 30);
+            }, 5500);
+
+            setTimeout(() => tc.lerpAdd(0, -20, 30), 6000);
+            setTimeout(() => {
+                texts.addChild(new TextObject(textX, textY += 30, "They buy a charming house.", textCol2, "LouisGeorgeCafe.ttf", 22));
+            }, 6500);
+
+            if (!debug) {
+                setTimeout(() => tc.lerpAdd(0, -20, 30), 7000);
+                setTimeout(() => {
+                    texts.addChild(new TextObject(textX, textY += 30, "Real estate values go up.", textCol2, "LouisGeorgeCafe.ttf", 22));
+                }, 7500);
+
+                setTimeout(() => tc.lerpAdd(0, -30, 30), 8200);
+                setTimeout(() => {
+                    texts.addChild(new TextObject(textX, textY += 30, "Eventually, when they can afford live-in help,",
+                        textCol2, "LouisGeorgeCafe.ttf", 22));
+                }, 8700);
+
+                setTimeout(() => tc.lerpAdd(0, -30, 30), 9400);
+                setTimeout(() => {
+                    texts.addChild(new TextObject(textX, textY += 30, "they have two children, to whom they are devoted.",
+                        textCol2, "LouisGeorgeCafe.ttf", 22));
+                }, 9900);
+
+                setTimeout(() => tc.lerpAdd(0, -30, 30), 10600);
+                setTimeout(() => {
+                    texts.addChild(new TextObject(textX, textY += 30, "The children turn out well.", textCol2, "LouisGeorgeCafe.ttf", 22));
+                }, 11100);
+            }
+
+            setTimeout(() => {
+                texts.lerp(texts.color, [0, 0, 0, 0], 30);
+                displayCharacterSelectScreen();
+            }, debug ? 6500 : 12500);
+        }
+
+        function displayCharacterSelectScreen() {
+            let characterSelectScreen = GameObject.newDefault();
+            let lrp = characterSelectScreen.addChild(ModColorLerp.newWithCover(0, 0, [1, 1, 1, 0]));
+            lrp.lerp(lrp.color, [1, 1, 1, 1], 30);
+            _iJohn.lerpAdd(200, -80, 30);
+            _iMary.lerpAdd(-100, -80, 30);
+            theText = characterSelectScreen.addChild(new TextObject(300, 280, "Now, it's time to make your own story...",
+                [0, 0, 0, 1], "LouisGeorgeCafe.ttf", 26));
+            titleScene.addFirstChild(characterSelectScreen);
+
+            setTimeout(() => {
+                scene.removeChild(house);
+                theText.text = "Assigning characters...";
+                socket.emit('host assign characters');
+                let cbf = scene.addChild(new PositionLerp(0, 0, [
+                    new ContinueButton(window.innerWidth / 2 - 100, window.innerHeight / 2 + 130,
+                        new RectCollider(window.innerWidth / 2 - 50, window.innerHeight / 2 + 130, 80, 40))
+                ], EasingFunctions.easeInOutCubic));
+            }, 1000);
+        }
+
+        // Setup globals
+        let game, scene = GameObject.newDefault();
+
+        /// ------------- TITLE SCENE -------------- ///
+        ////////////////////////////////////////////////
         let titleScene = new GameObject(-5, -80, []);
-        let titleLerp = new ModColorLerp(0, 0, [255, 255, 0, 1]);
-        let positionLerp = new PositionLerp(0, 0, []);
-        titleLerp.addChild(new TextObject(window.innerWidth/2-230, window.innerHeight/2-40, "Happy Endings", [255,255,0,1], "YouthBrushDaylight.otf", 100));
-        titleLerp.addChild(new TextObject(window.innerWidth/2-120, window.innerHeight/2+40, "A GAME BY ETHAN ELSHYEB", [255,255,0,1], "LouisGeorgeCafe.ttf", 19));
-        titleLerp.addChild(new TextObject(window.innerWidth/2-200, window.innerHeight/2+90, "BASED ON THE STORY BY MARGARET ATWOOD", [255,255,0,1], "LouisGeorgeCafe.ttf", 19));
-        titleLerp.addChild(connText);
 
-        let cov = new ModColorLerp(0,0,[0.7,0.5,1,0.4]);
-        cov.addChild(new ColorCover([0.7,0.5,1,0.4]));
-        let back1 = new FlareObject(0, -100, "back.flr", 1.2, [0]);
-        scene.addChild(back1);
-        scene.addChild(cov);
+        // Title scene background with windmill etc
+        let back1 = scene.addChild(new FlareObject(0, -100, "back.flr", 1.2, [0]));
+
+        // Color overlay for the title scene to make it more purple
+        let animatedTitleTonemap = scene.addChild(ModColorLerp.newWithCover(0, 0, [0.7, 0.5, 1, 0.4]));
+
+        // Title screen texts
+        let titleLerp = new ModColorLerp(0, 0, [255, 255, 0, 1],
+            [new TextObject(window.innerWidth / 2 - 230, window.innerHeight / 2 - 40,
+                "Happy Endings", [255, 255, 0, 1], "YouthBrushDaylight.otf", 100),
+                new TextObject(window.innerWidth / 2 - 120, window.innerHeight / 2 + 40,
+                    "A GAME BY ETHAN ELSHYEB", [255, 255, 0, 1], "LouisGeorgeCafe.ttf", 19),
+                new TextObject(window.innerWidth / 2 - 200, window.innerHeight / 2 + 90,
+                    "BASED ON THE STORY BY MARGARET ATWOOD", [255, 255, 0, 1], "LouisGeorgeCafe.ttf", 19)]);
+
+        let connText = titleLerp.addChild(new TextObject(window.innerWidth / 2 - 110, window.innerHeight / 2 + 140,
+            "PLAYERS CONNECTED: 0", [1, 1, 0, 1], "LouisGeorgeCafe.ttf", 19));
+
         titleScene.addChild(titleLerp);
-        let fo = new FlareObject(0, 2000, "Sunset3.flr", 1.2, []);
-        scene.addChild(fo);
-        scene.addChild(titleScene);
-        positionLerp.addChild(new StartButton(window.innerWidth/2-50, window.innerHeight/2+130, new RectCollider(window.innerWidth/2-50, window.innerHeight/2+130, 80, 40)));
-        scene.addChild(positionLerp);
 
-        scene.addChild(clr);
+        // Add this here so that it does not cause lag by loading it later
+        let fo = scene.addChild(new FlareObject(0, 2000, "Sunset3.flr", 1.2, []));
+        scene.addChild(titleScene);
+
+        let startButtonPositioner = scene.addChild(new PositionLerp(0, 0, [
+            new StartButton(window.innerWidth / 2 - 50, window.innerHeight / 2 + 130,
+                new RectCollider(window.innerWidth / 2 - 50, window.innerHeight / 2 + 130, 80, 40))
+        ], EasingFunctions.easeInOutCubic));
+
+        let globalColorCover = scene.addChild(ModColorLerp.newWithCover(0, 0, [0, 0, 0, 1]));
 
         function onLoad() {
             game = new Game(document.getElementById("canvas"), scene, [
+                "house.flr",
+                "John.flr",
                 "mary2.flr",
                 "joe.flr",
                 "guy2.flr",
                 "back.flr",
                 "Sunset3.flr",
-                "heart2.flr"
+                "heart2.flr",
+                "farm.flr"
             ], ["YouthBrushDaylight.otf", "LouisGeorgeCafe.ttf"]);
-            clr.lerp([0,0,0,1], [0,0,0,0], 60);
+            globalColorCover.lerp([0, 0, 0, 1], [0, 0, 0, 0], 60);
             game.start();
         }
     </script>
 </head>
 
 <body onload="onLoad()" style="background-color: black">
-    <canvas id="canvas" style="position:absolute;margin:0;padding:0;"></canvas>
+<canvas id="canvas" style="position:absolute;margin:0;padding:0;"></canvas>
 </body>
 
 </html>
